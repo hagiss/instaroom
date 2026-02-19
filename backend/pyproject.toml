@@ -1,0 +1,19 @@
+[project]
+name = "instaroom-backend"
+version = "0.1.0"
+description = "Analyze Instagram profiles and generate personalized 3D rooms"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
+    "instaloader>=4.13",
+    "google-genai>=1.0",
+    "httpx>=0.28",
+    "pydantic>=2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.9",
+    "pytest>=8.0",
+]
