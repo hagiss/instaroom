@@ -16,8 +16,8 @@
 
 ### 0-1. Public Accounts
 - User enters Instagram username
-- Server-side crawl via Instaloader (requires session login)
-- Target: most recent 50–100 posts
+- Server-side crawl via Apify Instagram Scraper (no login needed)
+- Target: most recent 10 posts
 
 ### 0-2. Private Accounts / No Instagram
 - User uploads 5–10 photos directly + optional bio text
@@ -338,7 +338,7 @@ What the user receives:
 
 | Stage | API | Estimated Cost |
 |---|---|---|
-| Stage 1 | Gemini 3 Flash × 50–100 posts | ~$0.3–0.5 |
+| Stage 1 | Gemini 3 Flash × 10 posts | ~$0.05–0.1 |
 | Stage 2 | Gemini 3 Flash × 1 call | ~$0.01 |
 | Stage 3 | Gemini 3 Flash × 3–4 calls | ~$0.05 |
 | Stage 4 | Nano Banana Pro × 1–3 calls | TBD (Gemini API pricing) |
@@ -350,7 +350,7 @@ What the user receives:
 ## Tech Stack
 
 - **Backend**: Python (FastAPI)
-- **Crawling**: Instaloader
+- **Crawling**: Apify Instagram Scraper
 - **VLM/LLM**: Gemini 3 Flash (analysis + prompt design + critique)
 - **Image Generation**: Nano Banana Pro (Gemini 3 Pro Image Preview)
 - **3D Generation**: World Labs API (Marble)

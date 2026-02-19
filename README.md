@@ -36,7 +36,7 @@ Username ─► Stage 0 ─► Stage 1 ─► Stage 2 ─► Stage 3 ─► Stag
 
 ### Stage 0 — Data Collection (`services/crawler/scraper.py`)
 
-- Calls the `apify/instagram-scraper` actor via Apify API to fetch profile metadata and recent posts (50–100)
+- Calls the `apify/instagram-scraper` actor via Apify API to fetch profile metadata and the 10 most recent posts
 - Requires `APIFY_API_TOKEN` — no Instagram login needed
 - Fallback: direct photo upload (5–10 images + optional bio)
 - Returns: list of `Post` objects (images, caption, hashtags, likes, date, location)
@@ -126,7 +126,7 @@ Response `200 OK`:
   "username": "instagram_handle",
   "status": "analyzing",
   "stage": 1,
-  "progress": "Analyzing post 12/50",
+  "progress": "Analyzing post 3/10",
   "result": null,
   "error": null
 }
