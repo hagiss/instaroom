@@ -13,6 +13,9 @@ from pydantic import BaseModel, Field
 # Re-export Stage 0 models so consumers can import from one place
 from app.services.crawler.scraper import Post, Profile, ScrapeResult
 
+# Re-export Stage 5 output models
+from app.services.worldslabs.models import ConvertToSceneResult, ViewerData
+
 __all__ = [
     # Stage 0 (re-exports)
     "Post", "Profile", "ScrapeResult",
@@ -25,6 +28,8 @@ __all__ = [
     "LayoutPlan", "ObjectDetail", "ImageGenPrompt",
     # Stage 4
     "CritiqueScores", "GenerationAttempt", "ImageGenResult",
+    # Stage 5 (re-exports)
+    "ConvertToSceneResult", "ViewerData",
 ]
 
 

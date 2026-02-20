@@ -1,4 +1,4 @@
-"""Pipeline orchestrator: runs Stages 1-4 sequentially and saves debug output."""
+"""Pipeline orchestrator: runs Stages 1-5 sequentially and saves debug output."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from app.services.image_gen.generate import generate_room_image
 from app.services.models import (
     AggregatedProfile,
+    ConvertToSceneResult,
     ImageGenPrompt,
     ImageGenResult,
     PostAnalysisWithMeta,
@@ -19,6 +20,13 @@ from app.services.models import (
 from app.services.vlm.aggregation import aggregate_analyses
 from app.services.vlm.analysis import analyze_posts
 from app.services.vlm.prompt import design_prompt
+from app.services.worldslabs import (
+    ConvertToSceneRequest,
+    WorldLabsError,
+    convert_to_3d_scene,
+    generate_3d_prompt,
+)
+from app.services.worldslabs.config import MarbleModel, get_api_key as _get_worldlabs_key
 
 logger = logging.getLogger(__name__)
 
@@ -26,10 +34,12 @@ logger = logging.getLogger(__name__)
 async def run_pipeline(
     crawl_result: ScrapeResult,
     output_dir: str = "output",
-) -> tuple[ImageGenResult, AggregatedProfile]:
-    """Run the full VLM pipeline: Stage 1 → 2 → 3 → 4.
+    run_3d_conversion: bool = False,
+) -> tuple[ImageGenResult, AggregatedProfile, ConvertToSceneResult | None]:
+    """Run the full VLM pipeline: Stage 1 → 2 → 3 → 4 → 5.
 
-    Returns the final image generation result and the aggregated profile.
+    Returns the final image generation result, the aggregated profile,
+    and the 3D scene conversion result (None if skipped or failed).
     All intermediate results are saved to a debug JSON file.
     """
     username = crawl_result.profile.username
@@ -61,10 +71,44 @@ async def run_pipeline(
                 result.total_attempts,
                 result.final_critique.avg_score if result.final_critique else 0)
 
-    # Save debug output
-    _save_debug_output(output_dir, crawl_result, analyses, profile, prompt_data, result)
+    # Stage 5: 3D conversion via World Labs Marble
+    scene_result: ConvertToSceneResult | None = None
+    if run_3d_conversion and result.final_image_base64:
+        try:
+            # Fail fast if key is missing — avoid wasting a Gemini call
+            _get_worldlabs_key()
 
-    return result, profile
+            logger.info("Stage 5: Converting to 3D scene via World Labs")
+
+            image_bytes = base64.b64decode(result.final_image_base64)
+
+            text_prompt_3d = await generate_3d_prompt(profile, prompt_data)
+            logger.info("Stage 5: 3D prompt generated (%d chars)", len(text_prompt_3d))
+
+            request = ConvertToSceneRequest(
+                image_bytes=image_bytes,
+                text_prompt=text_prompt_3d,
+                model=MarbleModel.MINI,
+                display_name=f"Instaroom — @{username}",
+                tags=["instaroom", username],
+            )
+
+            scene_result = await convert_to_3d_scene(request)
+            logger.info("Stage 5 complete: world_id=%s", scene_result.world_id)
+
+        except WorldLabsError:
+            logger.error("Stage 5 failed (WorldLabsError)", exc_info=True)
+        except Exception:
+            logger.error("Stage 5 failed (unexpected)", exc_info=True)
+    elif not run_3d_conversion:
+        logger.info("Stage 5: Skipped (run_3d_conversion=False)")
+    else:
+        logger.warning("Stage 5: Skipped (no final image from Stage 4)")
+
+    # Save debug output
+    _save_debug_output(output_dir, crawl_result, analyses, profile, prompt_data, result, scene_result)
+
+    return result, profile, scene_result
 
 
 def _save_debug_output(
@@ -74,6 +118,7 @@ def _save_debug_output(
     profile: AggregatedProfile,
     prompt_data: ImageGenPrompt,
     result: ImageGenResult,
+    scene_result: ConvertToSceneResult | None,
 ) -> None:
     """Save all intermediate results to a debug JSON file + image files."""
     username = crawl_result.profile.username
@@ -126,6 +171,12 @@ def _save_debug_output(
             "final_critique": result.final_critique.model_dump() if result.final_critique else None,
             "total_attempts": result.total_attempts,
         },
+        "stage_5_result": {
+            "world_id": scene_result.world_id if scene_result else None,
+            "world_marble_url": scene_result.world_marble_url if scene_result else None,
+            "thumbnail_url": scene_result.thumbnail_url if scene_result else None,
+            "viewer_data": scene_result.viewer_data.model_dump() if scene_result else None,
+        } if scene_result else None,
     }
 
     json_path = os.path.join(output_dir, f"{username}_{timestamp}.json")
