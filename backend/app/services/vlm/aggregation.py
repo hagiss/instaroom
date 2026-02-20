@@ -16,7 +16,7 @@ from app.services.gemini_client import FLASH_MODEL, get_gemini_client
 from app.services.models import (
     AggregatedProfile,
     PostAnalysisWithMeta,
-    ProfileData,
+    Profile,
     Prominence,
     RoomAtmosphere,
     ScoredObject,
@@ -54,7 +54,7 @@ class _AggregationVLMResponse(BaseModel):
 
 async def aggregate_analyses(
     analyses: list[PostAnalysisWithMeta],
-    profile: ProfileData,
+    profile: Profile,
 ) -> AggregatedProfile:
     """Aggregate per-post analyses into a single persona profile.
 
@@ -304,7 +304,7 @@ Return:
 async def _synthesize_persona(
     scored_objects: list[ScoredObject],
     atmosphere: RoomAtmosphere,
-    profile: ProfileData,
+    profile: Profile,
     analyses: list[PostAnalysisWithMeta],
 ) -> _AggregationVLMResponse:
     """Use VLM to create a persona summary and refine atmosphere."""

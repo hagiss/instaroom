@@ -11,10 +11,10 @@ from datetime import datetime, timezone
 from app.services.image_gen.generate import generate_room_image
 from app.services.models import (
     AggregatedProfile,
-    CrawlResult,
     ImageGenPrompt,
     ImageGenResult,
     PostAnalysisWithMeta,
+    ScrapeResult,
 )
 from app.services.vlm.aggregation import aggregate_analyses
 from app.services.vlm.analysis import analyze_posts
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 async def run_pipeline(
-    crawl_result: CrawlResult,
+    crawl_result: ScrapeResult,
     output_dir: str = "output",
 ) -> tuple[ImageGenResult, AggregatedProfile]:
     """Run the full VLM pipeline: Stage 1 → 2 → 3 → 4.
@@ -69,7 +69,7 @@ async def run_pipeline(
 
 def _save_debug_output(
     output_dir: str,
-    crawl_result: CrawlResult,
+    crawl_result: ScrapeResult,
     analyses: list[PostAnalysisWithMeta],
     profile: AggregatedProfile,
     prompt_data: ImageGenPrompt,

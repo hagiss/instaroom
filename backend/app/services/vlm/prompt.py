@@ -22,7 +22,7 @@ from app.services.models import (
 
 logger = logging.getLogger(__name__)
 
-_MAX_REFERENCE_IMAGES = 14  # Nano Banana Pro limit
+_MAX_REFERENCE_IMAGES = 14  # Gemini image generation limit
 
 
 # ---------------------------------------------------------------------------

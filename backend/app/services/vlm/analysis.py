@@ -65,12 +65,12 @@ async def analyze_posts(posts: list[Post]) -> list[PostAnalysisWithMeta]:
 
     async with httpx.AsyncClient(timeout=30.0) as http_client:
 
-        async def _analyze_one(post: Post) -> PostAnalysisWithMeta | None:
+        async def _analyze_one(idx: int, post: Post) -> PostAnalysisWithMeta | None:
             async with sem:
-                return await _analyze_single_post(post, http_client)
+                return await _analyze_single_post(idx, post, http_client)
 
         results = await asyncio.gather(
-            *[_analyze_one(p) for p in posts],
+            *[_analyze_one(i, p) for i, p in enumerate(posts)],
             return_exceptions=True,
         )
 
@@ -78,8 +78,8 @@ async def analyze_posts(posts: list[Post]) -> list[PostAnalysisWithMeta]:
     for i, result in enumerate(results):
         if isinstance(result, Exception):
             logger.error(
-                "Failed to analyze post %s: %s",
-                posts[i].post_id,
+                "Failed to analyze post #%d: %s",
+                i,
                 result,
             )
         elif result is not None:
@@ -90,6 +90,7 @@ async def analyze_posts(posts: list[Post]) -> list[PostAnalysisWithMeta]:
 
 
 async def _analyze_single_post(
+    index: int,
     post: Post,
     http_client: httpx.AsyncClient,
 ) -> PostAnalysisWithMeta | None:
@@ -97,18 +98,17 @@ async def _analyze_single_post(
     # Determine which images to send
     image_urls = post.image_urls or []
     if not image_urls and post.video_url:
-        # Video with no thumbnail — skip
-        logger.warning("Post %s is video with no thumbnail, skipping", post.post_id)
+        logger.warning("Post #%d is video with no thumbnail, skipping", index)
         return None
     if not image_urls:
-        logger.warning("Post %s has no images, skipping", post.post_id)
+        logger.warning("Post #%d has no images, skipping", index)
         return None
 
     # Download images
     image_bytes_list = await download_images(image_urls, client=http_client)
     valid_images = [b for b in image_bytes_list if b is not None]
     if not valid_images:
-        logger.warning("Post %s: all image downloads failed, skipping", post.post_id)
+        logger.warning("Post #%d: all image downloads failed, skipping", index)
         return None
 
     # Build the prompt
@@ -139,14 +139,14 @@ async def _analyze_single_post(
     # Parse the response
     raw_text = response.text
     if not raw_text:
-        logger.warning("Post %s: empty response from Gemini", post.post_id)
+        logger.warning("Post #%d: empty response from Gemini", index)
         return None
 
     analysis = PostAnalysis.model_validate_json(raw_text)
 
     return PostAnalysisWithMeta(
         analysis=analysis,
-        post_id=post.post_id,
+        post_index=index,
         likes=post.likes,
         image_urls=post.image_urls,
         caption=post.caption,

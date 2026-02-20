@@ -1,4 +1,8 @@
-"""Pydantic models for inter-stage data flow in the VLM pipeline."""
+"""Pydantic models for inter-stage data flow in the VLM pipeline.
+
+Stage 0 models (Post, Profile, ScrapeResult) are defined in
+app.services.crawler.scraper and re-exported here for convenience.
+"""
 
 from __future__ import annotations
 
@@ -6,34 +10,22 @@ import enum
 
 from pydantic import BaseModel, Field
 
+# Re-export Stage 0 models so consumers can import from one place
+from app.services.crawler.scraper import Post, Profile, ScrapeResult
 
-# ---------------------------------------------------------------------------
-# Stage 0 — Crawler output
-# ---------------------------------------------------------------------------
-
-class Post(BaseModel):
-    post_id: str
-    image_urls: list[str] = Field(default_factory=list)
-    video_url: str | None = None
-    caption: str = ""
-    hashtags: list[str] = Field(default_factory=list)
-    likes: int = 0
-    date: str = ""
-    location: str | None = None
-    is_video: bool = False
-
-
-class ProfileData(BaseModel):
-    username: str
-    biography: str = ""
-    profile_pic_url: str = ""
-    follower_count: int = 0
-    post_count: int = 0
-
-
-class CrawlResult(BaseModel):
-    profile: ProfileData
-    posts: list[Post]
+__all__ = [
+    # Stage 0 (re-exports)
+    "Post", "Profile", "ScrapeResult",
+    # Stage 1
+    "Prominence", "DetectedObject", "SceneInfo", "PeopleInfo",
+    "PostAnalysis", "PostAnalysisWithMeta",
+    # Stage 2
+    "ScoredObject", "RoomAtmosphere", "AggregatedProfile",
+    # Stage 3
+    "LayoutPlan", "ObjectDetail", "ImageGenPrompt",
+    # Stage 4
+    "CritiqueScores", "GenerationAttempt", "ImageGenResult",
+]
 
 
 # ---------------------------------------------------------------------------
@@ -80,7 +72,7 @@ class PostAnalysisWithMeta(BaseModel):
     """PostAnalysis enriched with post metadata for Stage 2."""
 
     analysis: PostAnalysis
-    post_id: str
+    post_index: int
     likes: int = 0
     image_urls: list[str] = Field(default_factory=list)
     caption: str = ""
