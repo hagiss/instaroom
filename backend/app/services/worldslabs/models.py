@@ -22,7 +22,7 @@ class ConvertToSceneRequest(BaseModel):
     image_bytes: bytes | None = None
     image_url: str | None = None
     text_prompt: str = DEFAULT_TEXT_PROMPT
-    model: MarbleModel = MarbleModel.PLUS
+    model: MarbleModel = MarbleModel.MINI
     display_name: str = "Instaroom scene"
     tags: list[str] = Field(default_factory=lambda: ["instaroom"])
     seed: int | None = None

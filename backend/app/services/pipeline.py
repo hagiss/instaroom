@@ -26,7 +26,7 @@ from app.services.worldslabs import (
     convert_to_3d_scene,
     generate_3d_prompt,
 )
-from app.services.worldslabs.config import MarbleModel
+from app.services.worldslabs.config import MarbleModel, get_api_key as _get_worldlabs_key
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 async def run_pipeline(
     crawl_result: ScrapeResult,
     output_dir: str = "output",
-    run_3d_conversion: bool = True,
+    run_3d_conversion: bool = False,
 ) -> tuple[ImageGenResult, AggregatedProfile, ConvertToSceneResult | None]:
     """Run the full VLM pipeline: Stage 1 → 2 → 3 → 4 → 5.
 
@@ -75,6 +75,9 @@ async def run_pipeline(
     scene_result: ConvertToSceneResult | None = None
     if run_3d_conversion and result.final_image_base64:
         try:
+            # Fail fast if key is missing — avoid wasting a Gemini call
+            _get_worldlabs_key()
+
             logger.info("Stage 5: Converting to 3D scene via World Labs")
 
             image_bytes = base64.b64decode(result.final_image_base64)
