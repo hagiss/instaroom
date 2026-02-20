@@ -13,7 +13,7 @@ from google import genai
 logger = logging.getLogger(__name__)
 
 FLASH_MODEL = "gemini-2.5-flash"
-IMAGE_GEN_MODEL = "gemini-3-flash-preview"
+IMAGE_GEN_MODEL = "gemini-3-pro-image-preview"
 
 
 @lru_cache(maxsize=1)

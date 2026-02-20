@@ -86,7 +86,7 @@ def _save_debug_output(
     for attempt in result.attempts:
         image_filename = ""
         if attempt.image_base64:
-            image_filename = f"{username}_attempt_{attempt.attempt_number}.png"
+            image_filename = f"{username}_{timestamp}_attempt_{attempt.attempt_number}.png"
             image_path = os.path.join(output_dir, image_filename)
             try:
                 image_bytes = base64.b64decode(attempt.image_base64)

@@ -92,19 +92,28 @@ async def design_prompt(profile: AggregatedProfile) -> ImageGenPrompt:
 def _build_reference_images(
     profile: AggregatedProfile,
 ) -> tuple[list[str], dict[int, str]]:
-    """Build ordered reference image list from key objects.
+    """Build deduplicated reference image list from key objects.
 
-    Returns (urls, mapping) where mapping is {1-indexed position: object description}.
+    Multiple objects from the same source image share one reference image number.
+    Returns (urls, mapping) where mapping is {1-indexed position: comma-separated object names}.
     """
     urls: list[str] = []
+    url_to_index: dict[str, int] = {}
     mapping: dict[int, str] = {}
 
     for obj in profile.key_objects:
-        if len(urls) >= _MAX_REFERENCE_IMAGES:
-            break
-        if obj.source_image_url:
+        if not obj.source_image_url:
+            continue
+        if obj.source_image_url in url_to_index:
+            idx = url_to_index[obj.source_image_url]
+            mapping[idx] = f"{mapping[idx]}, {obj.name}"
+        else:
+            if len(urls) >= _MAX_REFERENCE_IMAGES:
+                break
             urls.append(obj.source_image_url)
-            mapping[len(urls)] = obj.name
+            idx = len(urls)
+            url_to_index[obj.source_image_url] = idx
+            mapping[idx] = obj.name
 
     return urls, mapping
 
@@ -130,6 +139,19 @@ Design a room layout with these constraints:
 2. ALL key objects must be visible from a SINGLE camera viewpoint — this is a hard constraint
 3. Arrange objects naturally so they can all be seen from one direction
 4. Choose a camera position and direction that captures the most compelling composition
+5. IMPORTANT — counterfactual objects: If an object cannot realistically exist as a physical \
+item inside a room (e.g., wild animals, natural landscapes, bodies of water, large vehicles, \
+weather phenomena), represent it as a **framed photograph or artwork on the wall** instead of \
+placing it literally in the room. For example, "jaguar" → a framed photo of a jaguar on the wall; \
+"river_water" → a landscape photograph of a river hanging above the desk. Only everyday, \
+human-scale items should be placed as physical objects.
+6. IMPORTANT — people/humans: NEVER place actual human figures in the room. Instead, convey \
+their presence through **traces and signs of life** — a chair pulled back from the desk, a \
+half-finished cup of coffee, an open notebook with handwriting, shoes by the door, a jacket \
+tossed over a chair, etc. The room should feel like someone just stepped out for a moment. \
+If the key objects include a "person" or group of people, convert them into evidence of their \
+activity and culture (e.g., traditional artifacts, personal items, cultural decorations) rather \
+than depicting actual people.
 
 Return:
 - room_shape: The shape of the room (e.g., "rectangular", "L-shaped", "open plan")
@@ -199,6 +221,15 @@ For each object, describe how it appears FROM THE CAMERA'S PERSPECTIVE. Include:
 - detailed_description: vivid, specific visual description as seen from the camera angle. \
 Include material, color, texture, size relative to the scene, and any distinctive features \
 that make it personal rather than generic.
+
+IMPORTANT: If an object cannot realistically exist as a physical item in a room (e.g., wild \
+animals, natural landscapes, bodies of water), describe it as a framed photograph or artwork \
+on the wall. For example, describe "jaguar" as "a framed photograph of a jaguar" with details \
+about the frame style, print quality, and how it fits the room's aesthetic.
+
+IMPORTANT: If an object is a person or group of people, do NOT describe them as human figures. \
+Instead, describe traces of their presence — personal belongings left behind, cultural artifacts, \
+a chair pulled back, an open book, a warm drink. The room should feel recently inhabited, not occupied.
 """
 
 
@@ -270,6 +301,17 @@ so the image generator knows to match the reference
 - Describe lighting, colors, mood, and atmosphere
 - Include what's visible through the window
 - Make it feel like a real, lived-in space — not a catalog
+- IMPORTANT: If any key object cannot realistically exist as a physical item in a room \
+(e.g., wild animals, natural landscapes, bodies of water, large vehicles), describe it as \
+a **framed photograph or artwork on the wall** — NOT as a literal object in the room. \
+For example, instead of "a jaguar lounging on the floor", write "a beautifully framed \
+photograph of a jaguar hanging on the wall". Only everyday, human-scale items should appear \
+as physical objects in the room.
+- IMPORTANT: NEVER include actual human figures in the scene. If a key object is a person \
+or group of people, represent them through **traces of their presence** — personal belongings, \
+cultural artifacts, a chair pulled away from a desk, half-finished drinks, open journals, \
+shoes by the door. The room should feel like someone just stepped out, alive with their \
+personality but empty of people.
 - Do NOT use bullet points or structured format — write flowing prose
 - Keep it under 300 words
 
