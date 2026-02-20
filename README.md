@@ -12,12 +12,15 @@ backend/
 │   │   ├── generate.py                # POST /api/generate, POST /api/generate/upload, GET /api/jobs/{id}
 │   │   └── rooms.py                   # GET /api/rooms/{id}, GET /api/rooms/by-username/{username}
 │   └── services/
+│       ├── models.py                  # Pydantic models for inter-stage data flow
+│       ├── gemini_client.py           # Shared Gemini client singleton + image utilities
+│       ├── pipeline.py                # Orchestrator: runs Stages 1-4, saves debug output
 │       ├── crawler/scraper.py         # Stage 0: Apify Instagram Scraper
 │       ├── vlm/
 │       │   ├── analysis.py            # Stage 1: Per-post VLM analysis
 │       │   ├── aggregation.py         # Stage 2: Persona profile aggregation
 │       │   └── prompt.py              # Stage 3: Agentic prompt design
-│       ├── image_gen/generate.py      # Stage 4: Nano Banana Pro + self-critique
+│       ├── image_gen/generate.py      # Stage 4: Image gen + self-critique
 │       └── worldslabs/convert.py      # Stage 5: World Labs 3D conversion
 ├── pyproject.toml
 └── .env.example
@@ -30,8 +33,8 @@ frontend/                              # Next.js + Spark (Three.js) for 3D rende
 ```
 Username ─► Stage 0 ─► Stage 1 ─► Stage 2 ─► Stage 3 ─► Stage 4 ─► Stage 5 ─► 3D Room
             Crawl       Analyze    Aggregate   Prompt     Image Gen   3D Convert
-            (Apify      (Gemini    (Gemini     (Gemini    (Nano       (World Labs
-             Scraper)    Flash)     Flash)      Flash)     Banana)     Marble)
+            (Apify      (Gemini    (Gemini     (Gemini    (Image Gen  (World Labs
+             Scraper)    Flash)     Flash)      Flash)     Model)      Marble)
 ```
 
 ### Stage 0 — Data Collection (`services/crawler/scraper.py`)
@@ -44,33 +47,50 @@ Username ─► Stage 0 ─► Stage 1 ─► Stage 2 ─► Stage 3 ─► Stag
 ### Stage 1 — Per-Post Analysis (`services/vlm/analysis.py`)
 
 - Sends each post (image + caption + hashtags) to **Gemini Flash**
+- Analyzes ALL post types including videos (uses thumbnail image)
+- For carousel posts: sends ALL images in one VLM call for holistic analysis
 - Extracts structured JSON per post: objects, scene, people, emotional_weight, frame_worthy
-- All posts are analyzed independently — can be parallelized with `asyncio.gather`
+- Concurrent analysis with `asyncio.gather` + semaphore for rate limiting
 
 ### Stage 2 — Aggregation (`services/vlm/aggregation.py`)
 
 - Combines all per-post analyses into a single persona profile
-- Object importance scoring: `f(frequency, prominence, emotional_weight, likes)` → top 5–8 objects
-- Frame photo selection: rank frame_worthy posts by emotional_weight + likes → 3–5 photos
+- **VLM-based semantic deduplication**: groups similar objects (e.g., "acoustic_guitar"/"guitar" → "guitar")
+- Object importance scoring: `f(frequency, prominence, emotional_weight, likes)` → top 8 objects
+- Tracks `source_image_url` for each object (the post where it appears most prominently)
 - Room atmosphere derivation: dominant mood, lighting, color palette, style, window view
+- **VLM persona synthesis**: generates persona summary and refines atmosphere
+- Total: 2 VLM calls (dedup + synthesis)
 
 ### Stage 3 — Prompt Design (`services/vlm/prompt.py`)
 
-- Takes the aggregated profile and builds a Nano Banana Pro prompt step by step via Gemini Flash
-- Sub-steps: layout planning → object detail descriptions → frame photo descriptions → final assembly
-- Also selects reference images (frame source photos + atmosphere reference) for the image gen call
+- Takes the aggregated profile and builds an image generation prompt step by step via Gemini Flash
+- Generates a **single-viewpoint** prompt — describes what's visible from one camera angle
+- Hard constraint: the chosen viewpoint MUST have ALL important objects visible in frame
+- Sub-steps (3 VLM calls): layout planning → object detail descriptions → final prompt assembly
+- **Reference image strategy**: passes source images for key objects so the generator can reproduce their actual appearance (e.g., the specific guitar, the specific cat)
+- Final prompt references images by number: "the guitar from reference image 1"
 
 ### Stage 4 — Image Generation + Critique (`services/image_gen/generate.py`)
 
-- Calls **Nano Banana Pro** (Gemini Pro Image Preview) with the assembled prompt + reference images
-- Self-critique via Gemini Flash: scores object_presence, atmosphere_match, spatial_coherence, frame_photos, overall_quality (each 1–5)
-- Retries up to 3 times, adjusting the prompt based on low-scoring criteria
+- Calls image generation model with the assembled prompt + reference images (up to 14)
+- Self-critique via Gemini Flash: scores object_presence, atmosphere_match, spatial_coherence, overall_quality (each 1–4)
+- **1 round max**: generate → critique → optionally regenerate once if avg score < 3.5
+- Returns best attempt by average critique score
 
 ### Stage 5 — 3D Conversion (`services/worldslabs/convert.py`)
 
 - Sends the final room image to **World Labs API** (Marble 0.1-plus or 0.1-mini)
 - Output: Gaussian splat + collider mesh + thumbnail + panorama
 - Rendered in browser via Spark (Three.js-based)
+
+### Debug Output
+
+The pipeline orchestrator (`services/pipeline.py`) saves all intermediate results to `output/{username}_{timestamp}.json`:
+- Stage 1: Full per-post analyses
+- Stage 2: Aggregated profile (persona, objects, atmosphere)
+- Stage 3: Layout plan, object details, final prompt, reference image mapping
+- Stage 4: Critique scores per attempt (images saved as separate PNG files)
 
 ## API
 
@@ -244,7 +264,7 @@ Returning user (homepage):
 | Backend | Python, FastAPI |
 | Crawling | Apify Instagram Scraper |
 | VLM / LLM | Gemini Flash (analysis, aggregation, prompt design, critique) |
-| Image Gen | Nano Banana Pro (Gemini Pro Image Preview) |
+| Image Gen | Gemini image generation model |
 | 3D Gen | World Labs Marble API |
 | 3D Rendering | Spark (Three.js) |
 | Frontend | Next.js |
@@ -253,7 +273,7 @@ Returning user (homepage):
 ## Environment Variables
 
 ```
-GOOGLE_API_KEY=         # Gemini Flash + Nano Banana Pro
+GOOGLE_API_KEY=         # Gemini Flash + image generation
 APIFY_API_TOKEN=        # Apify Instagram Scraper
 WORLDLABS_API_KEY=      # World Labs Marble API
 ```
