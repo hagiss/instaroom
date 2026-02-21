@@ -1,0 +1,134 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  --color-glow: var(--glow);
+}
+
+:root {
+  --radius: 0.625rem;
+  --background: hsl(230 15% 6%);
+  --foreground: hsl(0 0% 95%);
+  --card: hsl(230 15% 10%);
+  --card-foreground: hsl(0 0% 95%);
+  --popover: hsl(230 15% 10%);
+  --popover-foreground: hsl(0 0% 95%);
+  --primary: hsl(180 70% 50%);
+  --primary-foreground: hsl(230 15% 6%);
+  --secondary: hsl(230 10% 16%);
+  --secondary-foreground: hsl(0 0% 90%);
+  --muted: hsl(230 10% 14%);
+  --muted-foreground: hsl(230 5% 55%);
+  --accent: hsl(230 10% 16%);
+  --accent-foreground: hsl(0 0% 95%);
+  --destructive: hsl(0 72% 51%);
+  --border: hsl(0 0% 100% / 0.08);
+  --input: hsl(0 0% 100% / 0.08);
+  --ring: hsl(180 70% 50%);
+  --glow: hsl(180 70% 50%);
+  --chart-1: hsl(180 70% 50%);
+  --chart-2: hsl(160 60% 45%);
+  --chart-3: hsl(200 70% 50%);
+  --chart-4: hsl(280 65% 60%);
+  --chart-5: hsl(340 75% 55%);
+  --sidebar: hsl(230 15% 8%);
+  --sidebar-foreground: hsl(0 0% 95%);
+  --sidebar-primary: hsl(180 70% 50%);
+  --sidebar-primary-foreground: hsl(230 15% 6%);
+  --sidebar-accent: hsl(230 10% 16%);
+  --sidebar-accent-foreground: hsl(0 0% 95%);
+  --sidebar-border: hsl(0 0% 100% / 0.08);
+  --sidebar-ring: hsl(180 70% 50%);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .glass {
+    background: hsl(0 0% 100% / 0.03);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid hsl(0 0% 100% / 0.08);
+  }
+
+  .glass-strong {
+    background: hsl(0 0% 100% / 0.06);
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+    border: 1px solid hsl(0 0% 100% / 0.12);
+  }
+
+  .glow {
+    box-shadow:
+      0 0 20px hsl(180 70% 50% / 0.15),
+      0 0 60px hsl(180 70% 50% / 0.05);
+  }
+
+  .glow-text {
+    text-shadow: 0 0 30px hsl(180 70% 50% / 0.5);
+  }
+
+  .gradient-bg {
+    background: radial-gradient(
+        ellipse 80% 50% at 50% -20%,
+        hsl(180 70% 50% / 0.08),
+        transparent
+      ),
+      radial-gradient(
+        ellipse 60% 40% at 80% 50%,
+        hsl(260 70% 50% / 0.05),
+        transparent
+      ),
+      hsl(230 15% 6%);
+  }
+}

@@ -1,0 +1,103 @@
+{
+  "meta": {
+    "title": "Instaroom — Your Instagram, Your 3D Room",
+    "description": "Transform your Instagram aesthetic into a unique 3D room you can explore"
+  },
+  "header": {
+    "title": "Instaroom"
+  },
+  "home": {
+    "hero": {
+      "title": "Your Instagram,",
+      "titleAccent": "Your 3D Room",
+      "subtitle": "We analyze your posts and create a personalized room that reflects your aesthetic — explorable in 3D."
+    },
+    "input": {
+      "label": "Instagram Username",
+      "placeholder": "Enter your Instagram username",
+      "button": "Create My Room",
+      "loading": "Starting...",
+      "error": {
+        "required": "Please enter a username",
+        "invalid": "Only letters, numbers, dots, and underscores",
+        "failed": "Something went wrong. Please try again."
+      }
+    },
+    "recentJobs": {
+      "title": "Welcome back!",
+      "viewRoom": "View your room",
+      "checkStatus": "Check progress"
+    }
+  },
+  "status": {
+    "title": "Creating Your Room",
+    "subtitle": "We're building a 3D room based on @{username}'s Instagram",
+    "stages": {
+      "crawling": {
+        "label": "Collecting Posts",
+        "description": "Fetching photos and captions from Instagram"
+      },
+      "analyzing": {
+        "label": "Analyzing Content",
+        "description": "Understanding the aesthetic of each post"
+      },
+      "aggregating": {
+        "label": "Building Profile",
+        "description": "Identifying your unique style and taste"
+      },
+      "prompting": {
+        "label": "Designing Room",
+        "description": "Crafting the perfect room layout for you"
+      },
+      "generating_image": {
+        "label": "Rendering Image",
+        "description": "Generating a high-quality room image"
+      },
+      "converting_3d": {
+        "label": "Building 3D",
+        "description": "Converting your room into an explorable 3D scene"
+      }
+    },
+    "completed": "Your room is ready!",
+    "failed": {
+      "title": "Something went wrong",
+      "retry": "Try Again"
+    }
+  },
+  "room": {
+    "title": "{username}'s Room",
+    "description": "A personalized 3D room based on {username}'s Instagram aesthetic",
+    "persona": {
+      "title": "About This Room",
+      "showMore": "Show more",
+      "showLess": "Show less"
+    },
+    "viewer": {
+      "loading": "Loading 3D scene...",
+      "reset": "Reset View",
+      "fullscreen": "Fullscreen",
+      "exitFullscreen": "Exit Fullscreen"
+    },
+    "share": {
+      "title": "Share This Room",
+      "copy": "Copy Link",
+      "copied": "Copied!",
+      "twitter": "Share on X",
+      "native": "Share"
+    },
+    "notFound": {
+      "title": "Room Not Found",
+      "description": "This room doesn't exist yet. Create one from the homepage!",
+      "goHome": "Go Home"
+    }
+  },
+  "footer": {
+    "tagline": "Transform your Instagram into a 3D experience",
+    "madeWith": "Made with AI"
+  },
+  "notFound": {
+    "title": "Page Not Found",
+    "description": "The page you're looking for doesn't exist.",
+    "goHome": "Go Home"
+  }
+}

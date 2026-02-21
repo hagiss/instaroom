@@ -1,0 +1,103 @@
+{
+  "meta": {
+    "title": "Instaroom — 인스타그램으로 만드는 나만의 3D 방",
+    "description": "당신의 인스타그램 감성을 반영한 3D 방을 만들어보세요"
+  },
+  "header": {
+    "title": "Instaroom"
+  },
+  "home": {
+    "hero": {
+      "title": "나의 인스타그램,",
+      "titleAccent": "나만의 3D 방",
+      "subtitle": "인스타그램 게시물을 분석해 당신의 감성이 담긴 3D 방을 만들어드려요."
+    },
+    "input": {
+      "label": "인스타그램 사용자명",
+      "placeholder": "인스타그램 사용자명을 입력하세요",
+      "button": "내 방 만들기",
+      "loading": "시작하는 중...",
+      "error": {
+        "required": "사용자명을 입력해주세요",
+        "invalid": "영문, 숫자, 점, 밑줄만 사용 가능합니다",
+        "failed": "문제가 발생했습니다. 다시 시도해주세요."
+      }
+    },
+    "recentJobs": {
+      "title": "다시 오셨군요!",
+      "viewRoom": "내 방 보기",
+      "checkStatus": "진행 상황 확인"
+    }
+  },
+  "status": {
+    "title": "방을 만들고 있어요",
+    "subtitle": "@{username}의 인스타그램을 기반으로 3D 방을 만들고 있습니다",
+    "stages": {
+      "crawling": {
+        "label": "게시물 수집 중",
+        "description": "인스타그램에서 사진과 캡션을 가져오고 있어요"
+      },
+      "analyzing": {
+        "label": "콘텐츠 분석 중",
+        "description": "각 게시물의 분위기를 파악하고 있어요"
+      },
+      "aggregating": {
+        "label": "프로필 구성 중",
+        "description": "당신만의 스타일과 취향을 찾고 있어요"
+      },
+      "prompting": {
+        "label": "방 디자인 중",
+        "description": "당신에게 딱 맞는 방 구조를 설계하고 있어요"
+      },
+      "generating_image": {
+        "label": "이미지 생성 중",
+        "description": "고품질 방 이미지를 만들고 있어요"
+      },
+      "converting_3d": {
+        "label": "3D 변환 중",
+        "description": "방을 탐험 가능한 3D 공간으로 만들고 있어요"
+      }
+    },
+    "completed": "방이 완성되었어요!",
+    "failed": {
+      "title": "문제가 발생했습니다",
+      "retry": "다시 시도"
+    }
+  },
+  "room": {
+    "title": "{username}의 방",
+    "description": "{username}의 인스타그램 감성을 반영한 3D 방",
+    "persona": {
+      "title": "이 방에 대해",
+      "showMore": "더 보기",
+      "showLess": "접기"
+    },
+    "viewer": {
+      "loading": "3D 장면 로딩 중...",
+      "reset": "초기화",
+      "fullscreen": "전체 화면",
+      "exitFullscreen": "전체 화면 종료"
+    },
+    "share": {
+      "title": "이 방 공유하기",
+      "copy": "링크 복사",
+      "copied": "복사됨!",
+      "twitter": "X에 공유",
+      "native": "공유"
+    },
+    "notFound": {
+      "title": "방을 찾을 수 없어요",
+      "description": "아직 만들어지지 않은 방이에요. 홈에서 만들어보세요!",
+      "goHome": "홈으로"
+    }
+  },
+  "footer": {
+    "tagline": "인스타그램을 3D 경험으로",
+    "madeWith": "AI로 만들었어요"
+  },
+  "notFound": {
+    "title": "페이지를 찾을 수 없어요",
+    "description": "요청하신 페이지가 존재하지 않습니다.",
+    "goHome": "홈으로"
+  }
+}
