@@ -88,7 +88,7 @@ async def run_pipeline(
             request = ConvertToSceneRequest(
                 image_bytes=image_bytes,
                 text_prompt=text_prompt_3d,
-                model=MarbleModel.MINI,
+                model=MarbleModel.PLUS,
                 display_name=f"Instaroom — @{username}",
                 tags=["instaroom", username],
             )

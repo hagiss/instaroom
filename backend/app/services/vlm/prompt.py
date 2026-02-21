@@ -130,22 +130,24 @@ You are an expert interior designer planning a room layout for image generation.
 **Atmosphere**: mood={mood}, lighting={lighting}, time_of_day={time_of_day}
 **Window view**: {window_view}
 **Room size**: {room_size}
+**Color palette**: {colors}
 
 **Key objects that MUST be in the room** (ranked by importance):
 {objects_text}
 
 Design a room layout with these constraints:
-1. The room should feel personal and lived-in, not like a showroom
-2. ALL key objects must be visible from a SINGLE camera viewpoint — this is a hard constraint
-3. Arrange objects naturally so they can all be seen from one direction
-4. Choose a camera position and direction that captures the most compelling composition
-5. IMPORTANT — counterfactual objects: If an object cannot realistically exist as a physical \
+
+**Hard constraints**:
+1. ALL key objects must be visible from a SINGLE camera viewpoint — this is a hard constraint
+2. Arrange objects naturally so they can all be seen from one direction
+3. Choose a camera position and direction that captures the most compelling composition
+4. IMPORTANT — counterfactual objects: If an object cannot realistically exist as a physical \
 item inside a room (e.g., wild animals, natural landscapes, bodies of water, large vehicles, \
 weather phenomena), represent it as a **framed photograph or artwork on the wall** instead of \
 placing it literally in the room. For example, "jaguar" → a framed photo of a jaguar on the wall; \
 "river_water" → a landscape photograph of a river hanging above the desk. Only everyday, \
 human-scale items should be placed as physical objects.
-6. IMPORTANT — people/humans: NEVER place actual human figures in the room. Instead, convey \
+5. IMPORTANT — people/humans: NEVER place actual human figures in the room. Instead, convey \
 their presence through **traces and signs of life** — a chair pulled back from the desk, a \
 half-finished cup of coffee, an open notebook with handwriting, shoes by the door, a jacket \
 tossed over a chair, etc. The room should feel like someone just stepped out for a moment. \
@@ -153,12 +155,28 @@ If the key objects include a "person" or group of people, convert them into evid
 activity and culture (e.g., traditional artifacts, personal items, cultural decorations) rather \
 than depicting actual people.
 
+**Styling guidance**:
+6. Let the color palette ({colors}) guide your choices — wall tones, furniture finishes, and \
+accent pieces should feel harmonious with these colors.
+7. **Walls (CRITICAL)**: Walls must NOT be plain white or off-white. Choose a bold, specific \
+wall treatment — deep-toned paint (forest green, navy, terracotta, charcoal), textured wallpaper, \
+exposed brick, wood paneling, or a statement accent wall. Pick a color from the palette ({colors}) \
+and commit to it. The walls set the entire mood of the room.
+8. **Flooring (CRITICAL)**: Choose a specific, characterful floor — rich dark hardwood, warm \
+honey oak, patterned cement tile, herringbone parquet, or stained concrete. Add an area rug \
+with color or pattern. The floor should be a design element, not an afterthought.
+9. Include at least one visible warm light source (a lamp, a fixture) so the room feels inhabited, \
+not just daylit.
+10. Design one area of the room as a cozy focal point — the most inviting spot that draws the eye.
+11. Create visual depth with interest at different heights — floor level, mid-height surfaces, \
+wall-mounted elements — so the room feels layered, not flat.
+
 Return:
 - room_shape: The shape of the room (e.g., "rectangular", "L-shaped", "open plan")
 - window_placement: Where the window is relative to the camera (e.g., "left wall", "far wall", "behind camera")
 - furniture: List of major furniture pieces and their positions
 - object_placements: Where each key object is placed (e.g., "acoustic_guitar: leaning against the wall to the right")
-- visual_flow: How the eye moves through the scene
+- visual_flow: How the eye moves through the scene, noting the focal point
 - camera_position: Where the camera is (e.g., "standing at the doorway", "corner of the room")
 - camera_direction: What direction the camera faces (e.g., "looking toward the far wall with window")
 """
@@ -170,6 +188,8 @@ async def _plan_layout(profile: AggregatedProfile) -> _LayoutResponse:
         for i, o in enumerate(profile.key_objects)
     )
 
+    colors = ", ".join(profile.atmosphere.color_palette) or "(varied)"
+
     prompt = _LAYOUT_PROMPT.format(
         persona=profile.persona_summary,
         style=profile.atmosphere.style,
@@ -178,6 +198,7 @@ async def _plan_layout(profile: AggregatedProfile) -> _LayoutResponse:
         time_of_day=profile.atmosphere.time_of_day,
         window_view=profile.atmosphere.window_view,
         room_size=profile.atmosphere.room_size,
+        colors=colors,
         objects_text=objects_text or "(no specific objects)",
     )
 
@@ -211,6 +232,7 @@ from a specific camera angle.
 **Camera position**: {camera_position}
 **Camera direction**: {camera_direction}
 **Room style**: {style}
+**Color palette**: {colors}
 
 **Objects and their placements**:
 {placements_text}
@@ -219,8 +241,14 @@ For each object, describe how it appears FROM THE CAMERA'S PERSPECTIVE. Include:
 - name: the object name
 - placement: where it sits in the frame (left, right, center, foreground, background)
 - detailed_description: vivid, specific visual description as seen from the camera angle. \
-Include material, color, texture, size relative to the scene, and any distinctive features \
-that make it personal rather than generic.
+Include:
+  * **Material and texture**: describe tactile qualities — woven, brushed, weathered, \
+polished, knitted, glazed, worn, smooth. Be specific about materials.
+  * **Color role**: note whether this object serves as a dominant tone, an accent pop, or \
+a neutral/grounding element within the palette ({colors}).
+  * **Personal character**: describe signs of use, wear, or personality that make this \
+object feel collected over time rather than bought from a catalog. A guitar with finger \
+marks, a well-thumbed book, a mug with a faded print.
 
 IMPORTANT: If an object cannot realistically exist as a physical item in a room (e.g., wild \
 animals, natural landscapes, bodies of water), describe it as a framed photograph or artwork \
@@ -242,10 +270,13 @@ async def _describe_objects(
         f"  - {o.name}: {o.description}" for o in profile.key_objects
     )
 
+    colors = ", ".join(profile.atmosphere.color_palette) or "(varied)"
+
     prompt = _OBJECT_DETAIL_PROMPT.format(
         camera_position=layout.camera_position or "doorway",
         camera_direction=layout.camera_direction or "looking into the room",
         style=profile.atmosphere.style,
+        colors=colors,
         placements_text=obj_placements,
     )
 
@@ -274,8 +305,9 @@ async def _describe_objects(
 # ---------------------------------------------------------------------------
 
 _ASSEMBLY_PROMPT = """\
-You are writing an image generation prompt for a room scene. Write a single, detailed, \
-natural-language paragraph that describes the room from the camera's viewpoint.
+You are writing an image generation prompt for a beautifully styled room scene. The room \
+should feel like it was lovingly collected and arranged over years — personal, warm, and \
+full of character — not purchased as a matching set.
 
 **Persona**: {persona}
 **Style**: {style}
@@ -298,22 +330,24 @@ Instructions:
 - Explicitly mention each key object with its visual details
 - For objects that have reference images, say "the [object] from reference image [N]" \
 so the image generator knows to match the reference
-- Describe lighting, colors, mood, and atmosphere
+- **Walls and floor are NOT optional** — explicitly describe the wall color/material and floor \
+material/color early in the prose. They set the mood for everything else. Walls must not be \
+plain white. Use the color palette ({colors}) to drive these choices. Then describe warm \
+lighting naturally as part of the scene, keeping the focus on the key objects.
 - Include what's visible through the window
-- Make it feel like a real, lived-in space — not a catalog
 - IMPORTANT: If any key object cannot realistically exist as a physical item in a room \
 (e.g., wild animals, natural landscapes, bodies of water, large vehicles), describe it as \
-a **framed photograph or artwork on the wall** — NOT as a literal object in the room. \
-For example, instead of "a jaguar lounging on the floor", write "a beautifully framed \
-photograph of a jaguar hanging on the wall". Only everyday, human-scale items should appear \
-as physical objects in the room.
+a **framed photograph or artwork on the wall** — NOT as a literal object in the room.
 - IMPORTANT: NEVER include actual human figures in the scene. If a key object is a person \
 or group of people, represent them through **traces of their presence** — personal belongings, \
 cultural artifacts, a chair pulled away from a desk, half-finished drinks, open journals, \
 shoes by the door. The room should feel like someone just stepped out, alive with their \
 personality but empty of people.
 - Do NOT use bullet points or structured format — write flowing prose
-- Keep it under 300 words
+- Keep it under 400 words
+- IMPORTANT: The final image should look like a **magazine-quality interior photograph** — \
+visually stunning, beautifully composed, with rich colors and cinematic lighting. Think \
+Architectural Digest or Kinfolk magazine editorial shoot.
 
 Return ONLY the prompt text, nothing else.
 """

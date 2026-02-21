@@ -62,6 +62,7 @@ async def generate_room_image(
             response_modalities=["TEXT", "IMAGE"],
             image_config=types.ImageConfig(
                 aspect_ratio="16:9",
+                image_size="4K",
             ),
         ),
     )

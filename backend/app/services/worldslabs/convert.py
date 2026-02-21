@@ -57,15 +57,18 @@ async def _upload_image(
 ) -> str:
     """Upload an image and return its ``media_asset_id``.
 
-    1. POST /media_assets:prepareUpload  →  signed URL + asset id
-    2. PUT  signed URL                   →  upload the bytes
+    1. POST /media-assets:prepare_upload  →  signed URL + asset id
+    2. PUT  signed URL                    →  upload the bytes
     """
     if filename is None:
         filename = f"instaroom-{uuid.uuid4().hex[:8]}.png"
 
+    # Derive extension from filename
+    extension = filename.rsplit(".", 1)[-1] if "." in filename else "png"
+
     resp = await client.post(
-        "/media_assets:prepareUpload",
-        json={"file_name": filename},
+        "/media-assets:prepare_upload",
+        json={"file_name": filename, "kind": "image", "extension": extension},
     )
     resp.raise_for_status()
     upload = PrepareUploadResponse.model_validate(resp.json())
@@ -74,13 +77,13 @@ async def _upload_image(
     # host (e.g. S3/GCS) and we must NOT send the WLT-Api-Key header there.
     async with httpx.AsyncClient(timeout=httpx.Timeout(120.0)) as upload_client:
         put_resp = await upload_client.put(
-            upload.upload_url,
+            upload.upload_info.upload_url,
             content=image_bytes,
-            headers=upload.upload_headers,
+            headers=upload.upload_info.required_headers,
         )
         put_resp.raise_for_status()
 
-    return upload.media_asset_id
+    return upload.media_asset.media_asset_id
 
 
 async def _submit_generation(
@@ -98,16 +101,16 @@ async def _submit_generation(
     else:
         image_prompt = None
 
-    prompt = WorldPrompt(
+    world_prompt = WorldPrompt(
         type="image" if image_prompt else "text",
         image_prompt=image_prompt,
         text_prompt=request.text_prompt,
+        model=request.model.value,
     )
 
     body = GenerateWorldRequest(
-        model=request.model.value,
-        prompt=prompt,
         display_name=request.display_name,
+        world_prompt=world_prompt,
         tags=request.tags,
         seed=request.seed,
     )
@@ -165,25 +168,26 @@ def _build_result(world: World) -> ConvertToSceneResult:
     """Map a ``World`` response to the pipeline output models."""
     # Pick best available splat URL: full_res > 500k > 100k
     splat_url: str | None = None
-    if world.splat_urls:
-        splat_url = (
-            world.splat_urls.full_res
-            or world.splat_urls.splat_500k
-            or world.splat_urls.splat_100k
-        )
+    if world.assets and world.assets.splats and world.assets.splats.spz_urls:
+        spz = world.assets.splats.spz_urls
+        splat_url = spz.full_res or spz.splat_500k or spz.splat_100k
+
     if not splat_url:
         raise WorldLabsError(
             f"World {world.world_id} has no splat download URLs"
         )
 
     collider_url = (
-        world.mesh_assets.collider_url if world.mesh_assets else None
+        world.assets.mesh.collider_mesh_url
+        if world.assets and world.assets.mesh else None
     )
     panorama_url = (
-        world.imagery_assets.panorama_url if world.imagery_assets else None
+        world.assets.imagery.pano_url
+        if world.assets and world.assets.imagery else None
     )
     thumbnail_url = (
-        world.imagery_assets.thumbnail_url if world.imagery_assets else None
+        world.assets.thumbnail_url
+        if world.assets else None
     )
 
     viewer_data = ViewerData(
@@ -195,7 +199,7 @@ def _build_result(world: World) -> ConvertToSceneResult:
     return ConvertToSceneResult(
         viewer_data=viewer_data,
         world_id=world.world_id,
-        world_marble_url=world.marble_url,
+        world_marble_url=world.world_marble_url,
         thumbnail_url=thumbnail_url,
     )
 

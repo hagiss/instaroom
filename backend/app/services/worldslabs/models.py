@@ -33,13 +33,25 @@ class ConvertToSceneRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class PrepareUploadResponse(BaseModel):
-    """Response from POST /media_assets:prepareUpload."""
+# --- prepare_upload ---
 
+class _MediaAsset(BaseModel):
     media_asset_id: str
-    upload_url: str
-    upload_headers: dict[str, str]
+    file_name: str | None = None
 
+class _UploadInfo(BaseModel):
+    upload_url: str
+    upload_method: str = "PUT"
+    required_headers: dict[str, str] = Field(default_factory=dict)
+
+class PrepareUploadResponse(BaseModel):
+    """Response from POST /media-assets:prepare_upload."""
+
+    media_asset: _MediaAsset
+    upload_info: _UploadInfo
+
+
+# --- worlds:generate request ---
 
 class ImagePrompt(BaseModel):
     """Reference to an image used as a generation prompt."""
@@ -55,20 +67,22 @@ class WorldPrompt(BaseModel):
     type: str = "image"
     image_prompt: ImagePrompt | None = None
     text_prompt: str | None = None
+    model: str | None = None
 
 
 class GenerateWorldRequest(BaseModel):
     """Body for POST /worlds:generate."""
 
-    model: str
-    prompt: WorldPrompt
     display_name: str = "Instaroom scene"
+    world_prompt: WorldPrompt
     tags: list[str] = Field(default_factory=list)
     seed: int | None = None
 
 
+# --- worlds:generate & operations response ---
+
 class GenerateWorldResponse(BaseModel):
-    """Response from POST /worlds:generate."""
+    """Response from POST /worlds:generate (operation object)."""
 
     operation_id: str
 
@@ -84,6 +98,7 @@ class OperationResponsePayload(BaseModel):
     """Nested response inside a completed operation."""
 
     world_id: str
+    world_marble_url: str | None = None
 
 
 class OperationStatus(BaseModel):
@@ -98,7 +113,7 @@ class OperationStatus(BaseModel):
 # --- World asset sub-models ---
 
 
-class SplatUrls(BaseModel):
+class SpzUrls(BaseModel):
     """Gaussian splat download URLs at different resolutions."""
 
     full_res: str | None = None
@@ -108,29 +123,34 @@ class SplatUrls(BaseModel):
     model_config = {"populate_by_name": True}
 
 
-class MeshAssets(BaseModel):
-    """Collider / navigation mesh assets."""
+class SplatAssets(BaseModel):
+    spz_urls: SpzUrls | None = None
 
-    collider_url: str | None = None
+
+class MeshAssets(BaseModel):
+    collider_mesh_url: str | None = None
 
 
 class ImageryAssets(BaseModel):
-    """Generated imagery (panorama, thumbnail)."""
+    pano_url: str | None = None
 
-    panorama_url: str | None = None
+
+class WorldAssets(BaseModel):
+    caption: str | None = None
     thumbnail_url: str | None = None
+    splats: SplatAssets | None = None
+    mesh: MeshAssets | None = None
+    imagery: ImageryAssets | None = None
 
 
 class World(BaseModel):
-    """Full world object returned by GET /worlds/{id}."""
+    """World object returned by GET /worlds/{id}."""
 
     world_id: str
     display_name: str | None = None
-    status: str | None = None
-    marble_url: str | None = None
-    splat_urls: SplatUrls | None = None
-    mesh_assets: MeshAssets | None = None
-    imagery_assets: ImageryAssets | None = None
+    world_marble_url: str | None = None
+    assets: WorldAssets | None = None
+    model: str | None = None
 
 
 # ---------------------------------------------------------------------------
