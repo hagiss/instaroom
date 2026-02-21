@@ -20,6 +20,7 @@ class ConvertToSceneRequest(BaseModel):
     """Input for Stage 5: 2D image → 3D scene conversion."""
 
     image_bytes: bytes | None = None
+    image_bytes_list: list[bytes] | None = None  # multi-image (forward + backward)
     image_url: str | None = None
     text_prompt: str = DEFAULT_TEXT_PROMPT
     model: MarbleModel = MarbleModel.MINI
@@ -61,11 +62,19 @@ class ImagePrompt(BaseModel):
     media_asset_id: str | None = None
 
 
+class MultiImagePromptItem(BaseModel):
+    """Single image within a multi-image prompt, with optional azimuth."""
+
+    azimuth: float | None = None  # 0=front, 180=back
+    content: ImagePrompt
+
+
 class WorldPrompt(BaseModel):
     """Prompt bundle sent with a generation request."""
 
     type: str = "image"
     image_prompt: ImagePrompt | None = None
+    multi_image_prompt: list[MultiImagePromptItem] | None = None
     text_prompt: str | None = None
     model: str | None = None
 

@@ -270,23 +270,73 @@ Returning user (homepage):
 | Frontend | Next.js |
 | Hosting | Vercel (frontend) + Render (backend) |
 
-## Environment Variables
+## Setup
 
-```
-GOOGLE_API_KEY=         # Gemini Flash + image generation
-APIFY_API_TOKEN=        # Apify Instagram Scraper
-WORLDLABS_API_KEY=      # World Labs Marble API
-```
-
-## Running Locally
+### 1. Install dependencies
 
 ```bash
-# Backend
 cd backend
-pip install -e .
-uvicorn app.main:app --reload
+python -m venv .venv
+source .venv/bin/activate   # macOS/Linux
+pip install -e ".[dev]"
+```
 
-# Frontend (after Next.js init)
+### 2. Configure environment variables
+
+Copy the example and fill in your API keys:
+
+```bash
+cp .env.example .env
+```
+
+| Variable | Required | Description |
+|---|---|---|
+| `GOOGLE_API_KEY` | **Yes** | Gemini Flash + image generation |
+| `APIFY_API_TOKEN` | For username flow | Apify Instagram Scraper |
+| `WORLDLABS_API_KEY` | For 3D (Stage 5) | World Labs Marble API |
+
+### 3. Run the backend
+
+```bash
+cd backend
+uvicorn app.main:app --reload
+```
+
+### 4. Run the frontend (after Next.js init)
+
+```bash
 cd frontend
 npm run dev
 ```
+
+## Testing
+
+### Quick test (pipeline only, no server)
+
+A standalone script is provided for quick pipeline testing without starting the full API:
+
+```bash
+cd backend
+source .venv/bin/activate
+
+# Requires GOOGLE_API_KEY in .env or environment
+# Uses the natgeo fixture by default
+.venv/bin/python tests/test_quick.py
+
+# Single-view mode (faster — 1 image instead of 2)
+.venv/bin/python tests/test_quick.py --single-view
+
+# With 3D conversion (requires WORLDLABS_API_KEY)
+.venv/bin/python tests/test_quick.py --3d
+```
+
+Output images and debug JSON are saved to `output/`.
+
+### Full test suite
+
+```bash
+cd backend
+.venv/bin/python -m pytest tests/test_pipeline.py -v -s
+```
+
+Requires `GOOGLE_API_KEY` to be set. Tests call live Gemini APIs.

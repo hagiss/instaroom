@@ -24,6 +24,7 @@ from .models import (
     GenerateWorldRequest,
     GenerateWorldResponse,
     ImagePrompt,
+    MultiImagePromptItem,
     OperationStatus,
     PrepareUploadResponse,
     ViewerData,
@@ -90,23 +91,61 @@ async def _submit_generation(
     client: httpx.AsyncClient,
     request: ConvertToSceneRequest,
     media_asset_id: str | None = None,
+    media_asset_ids: list[str] | None = None,
 ) -> str:
-    """Submit a world generation job and return its ``operation_id``."""
-    if media_asset_id:
+    """Submit a world generation job and return its ``operation_id``.
+
+    Supports single-image (media_asset_id) and multi-image (media_asset_ids
+    with azimuth 0° forward, 180° backward) modes.
+    """
+    if media_asset_ids and len(media_asset_ids) >= 2:
+        # Multi-image mode: forward (0°) + backward (180°)
+        multi_items = [
+            MultiImagePromptItem(
+                azimuth=0.0,
+                content=ImagePrompt(
+                    source="media_asset",
+                    media_asset_id=media_asset_ids[0],
+                ),
+            ),
+            MultiImagePromptItem(
+                azimuth=180.0,
+                content=ImagePrompt(
+                    source="media_asset",
+                    media_asset_id=media_asset_ids[1],
+                ),
+            ),
+        ]
+        world_prompt = WorldPrompt(
+            type="multi-image",
+            multi_image_prompt=multi_items,
+            text_prompt=request.text_prompt,
+            model=request.model.value,
+        )
+    elif media_asset_id:
         image_prompt = ImagePrompt(
             source="media_asset", media_asset_id=media_asset_id
         )
+        world_prompt = WorldPrompt(
+            type="image",
+            image_prompt=image_prompt,
+            text_prompt=request.text_prompt,
+            model=request.model.value,
+        )
     elif request.image_url:
         image_prompt = ImagePrompt(source="uri", uri=request.image_url)
+        world_prompt = WorldPrompt(
+            type="image",
+            image_prompt=image_prompt,
+            text_prompt=request.text_prompt,
+            model=request.model.value,
+        )
     else:
-        image_prompt = None
-
-    world_prompt = WorldPrompt(
-        type="image" if image_prompt else "text",
-        image_prompt=image_prompt,
-        text_prompt=request.text_prompt,
-        model=request.model.value,
-    )
+        world_prompt = WorldPrompt(
+            type="text",
+            text_prompt=request.text_prompt,
+            model=request.model.value,
+        )
 
     body = GenerateWorldRequest(
         display_name=request.display_name,
@@ -212,36 +251,48 @@ def _build_result(world: World) -> ConvertToSceneResult:
 async def convert_to_3d_scene(
     request: ConvertToSceneRequest,
 ) -> ConvertToSceneResult:
-    """Convert a 2D room image into an explorable 3D Gaussian Splatting scene.
+    """Convert 2D room image(s) into an explorable 3D Gaussian Splatting scene.
 
     This is the main entry-point for Stage 5 of the Instaroom pipeline.
-    Provide *either* ``image_bytes`` (raw PNG/JPEG) or ``image_url``
-    (publicly accessible URL).
+    Supports single-image (``image_bytes`` or ``image_url``) and multi-image
+    (``image_bytes_list`` with forward + backward views at 0° and 180° azimuth).
     """
-    if not request.image_bytes and not request.image_url:
+    has_multi = request.image_bytes_list and len(request.image_bytes_list) >= 2
+    has_single = request.image_bytes or request.image_url
+
+    if not has_multi and not has_single:
         raise ValueError(
-            "Provide either image_bytes or image_url in ConvertToSceneRequest"
+            "Provide image_bytes, image_url, or image_bytes_list "
+            "in ConvertToSceneRequest"
         )
 
     try:
         async with _build_client() as client:
-            # Step 1: upload if raw bytes were provided
             media_asset_id: str | None = None
-            if request.image_bytes:
+            media_asset_ids: list[str] | None = None
+
+            if has_multi:
+                # Multi-image: upload both in parallel
+                view_labels = ("fwd", "bwd")
+                upload_tasks = [
+                    _upload_image(client, img_bytes, f"instaroom-{view_labels[i]}.png")
+                    for i, img_bytes in enumerate(request.image_bytes_list[:2])
+                ]
+                media_asset_ids = await asyncio.gather(*upload_tasks)
+            elif request.image_bytes:
                 media_asset_id = await _upload_image(client, request.image_bytes)
 
-            # Step 2: submit generation
+            # Submit generation
             operation_id = await _submit_generation(
-                client, request, media_asset_id
+                client, request, media_asset_id, media_asset_ids,
             )
 
-            # Step 3: poll until done
+            # Poll until done
             world_id = await _poll_operation(client, operation_id)
 
-            # Step 4: fetch world with asset URLs
+            # Fetch world with asset URLs
             world = await _get_world(client, world_id)
 
-        # Step 5: map to pipeline output
         return _build_result(world)
 
     except WorldLabsError:

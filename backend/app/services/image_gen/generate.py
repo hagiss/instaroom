@@ -1,12 +1,15 @@
-"""Room image generation and self-critique loop.
+"""Dual-viewpoint room image generation with self-critique loop.
 
-Uses multi-turn chat for image generation so the model can iteratively
-refine its output based on critique feedback.
-Max 2 attempts total (1 round of critique).
+Uses a SINGLE multi-turn chat session to generate both forward and backward
+room images sequentially. This ensures geometric consistency — the model
+remembers the room it created for the forward view when generating the backward view.
+
+Max 2 attempts per viewpoint (1 round of critique each).
 """
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import io
 import logging
@@ -23,6 +26,7 @@ from app.services.gemini_client import (
 from app.services.models import (
     AggregatedProfile,
     CritiqueScores,
+    DualImageGenResult,
     GenerationAttempt,
     ImageGenPrompt,
     ImageGenResult,
@@ -33,28 +37,43 @@ logger = logging.getLogger(__name__)
 _CRITIQUE_THRESHOLD = 3.5
 _MAX_ATTEMPTS = 2
 
+_BACKWARD_TRANSITION = (
+    "Now turn the camera 180° to face the opposite direction. "
+    "The room you just created continues behind you — same walls, same floor, "
+    "same style and lighting. You are now looking at the other half of the room. "
+    "Generate this backward view:\n\n"
+)
+
 
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
-async def generate_room_image(
-    prompt_data: ImageGenPrompt,
+async def generate_dual_room_images(
+    forward_prompt: ImageGenPrompt,
+    backward_prompt: ImageGenPrompt | None,
     profile: AggregatedProfile,
-) -> ImageGenResult:
-    """Generate a room image with multi-turn critique-driven refinement.
+) -> DualImageGenResult:
+    """Generate forward (and optionally backward) room images.
 
-    1. Download reference images
-    2. Create a chat session with the image gen model
-    3. Turn 1: generate image from prompt + reference images
-    4. Critique with Gemini Flash
-    5. If avg score < 3.5, Turn 2: send critique feedback to same chat for refinement
-    6. Return best attempt
+    When backward_prompt is None, only the forward view is generated and
+    backward is returned as an empty ImageGenResult.
+
+    When backward_prompt is provided, both views are generated in a single
+    multi-turn chat session for geometric consistency.
     """
-    # Download reference images once
-    ref_pil_images = await _download_reference_images(prompt_data.reference_image_urls)
+    # Download reference images (parallel if both views needed)
+    if backward_prompt is not None:
+        fwd_ref_images, bwd_ref_images = await asyncio.gather(
+            _download_reference_images(forward_prompt.reference_image_urls),
+            _download_reference_images(backward_prompt.reference_image_urls),
+        )
+    else:
+        fwd_ref_images = await _download_reference_images(
+            forward_prompt.reference_image_urls,
+        )
 
-    # Create multi-turn chat session
+    # Create a single multi-turn chat session
     client = get_gemini_client()
     chat = client.aio.chats.create(
         model=IMAGE_GEN_MODEL,
@@ -67,19 +86,70 @@ async def generate_room_image(
         ),
     )
 
+    # --- Forward view ---
+    logger.info("Generating forward view")
+    forward_result = await _generate_single_view(
+        chat=chat,
+        prompt_data=forward_prompt,
+        profile=profile,
+        ref_images=fwd_ref_images,
+        view_label="forward",
+        transition_prefix=None,
+    )
+
+    # --- Backward view ---
+    if backward_prompt is not None:
+        logger.info("Generating backward view (same chat session)")
+        backward_result = await _generate_single_view(
+            chat=chat,
+            prompt_data=backward_prompt,
+            profile=profile,
+            ref_images=bwd_ref_images,
+            view_label="backward",
+            transition_prefix=_BACKWARD_TRANSITION,
+        )
+    else:
+        logger.info("Backward view skipped (single-view mode)")
+        backward_result = ImageGenResult()
+
+    return DualImageGenResult(
+        forward=forward_result,
+        backward=backward_result,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Single-view generation (used for both forward and backward)
+# ---------------------------------------------------------------------------
+
+async def _generate_single_view(
+    chat: types.AsyncChat,
+    prompt_data: ImageGenPrompt,
+    profile: AggregatedProfile,
+    ref_images: list[Image.Image],
+    view_label: str,
+    transition_prefix: str | None,
+) -> ImageGenResult:
+    """Generate a single viewpoint with critique-driven refinement.
+
+    Up to _MAX_ATTEMPTS turns in the chat for this viewpoint.
+    """
     attempts: list[GenerationAttempt] = []
     best_attempt: GenerationAttempt | None = None
 
     for attempt_num in range(1, _MAX_ATTEMPTS + 1):
         if attempt_num == 1:
-            # Turn 1: reference images + prompt
+            # First attempt: send reference images + prompt
             prompt_text = prompt_data.final_prompt
+            if transition_prefix:
+                prompt_text = transition_prefix + prompt_text
+
             message: list = []
-            for img in ref_pil_images:
+            for img in ref_images:
                 message.append(img)
             message.append(prompt_text)
         else:
-            # Turn 2: send critique feedback — the chat remembers the previous image
+            # Refinement: send critique feedback
             prompt_text = _build_refinement_message(
                 best_attempt.critique if best_attempt else None,
             )
@@ -88,14 +158,17 @@ async def generate_room_image(
         # Generate image via chat turn
         image_b64 = await _chat_generate(chat, message)
         if not image_b64:
-            logger.error("Image generation failed on attempt %d", attempt_num)
+            logger.error(
+                "%s view: image generation failed on attempt %d",
+                view_label, attempt_num,
+            )
             attempts.append(GenerationAttempt(
                 attempt_number=attempt_num,
                 prompt_used=prompt_text if isinstance(prompt_text, str) else str(prompt_text),
             ))
             continue
 
-        # Critique the generated image with Gemini Flash
+        # Critique — only against THIS view's objects
         critique = await _critique_image(image_b64, prompt_data, profile)
 
         attempt = GenerationAttempt(
@@ -106,7 +179,6 @@ async def generate_room_image(
         )
         attempts.append(attempt)
 
-        # Track best attempt: prefer critiqued over uncritiqued, then higher score
         if best_attempt is None or (
             critique is not None and (
                 best_attempt.critique is None
@@ -115,20 +187,25 @@ async def generate_room_image(
         ):
             best_attempt = attempt
 
-        # Check if good enough to stop
-        if critique and critique.avg_score >= _CRITIQUE_THRESHOLD:
+        if critique is None:
+            # Critique call failed (e.g. 503) — accept the image as-is
+            logger.warning(
+                "%s view attempt %d: critique failed, accepting image",
+                view_label, attempt_num,
+            )
+            break
+
+        if critique.avg_score >= _CRITIQUE_THRESHOLD:
             logger.info(
-                "Attempt %d scored %.2f (>= %.1f), stopping",
-                attempt_num, critique.avg_score, _CRITIQUE_THRESHOLD,
+                "%s view attempt %d scored %.2f (>= %.1f), stopping",
+                view_label, attempt_num, critique.avg_score, _CRITIQUE_THRESHOLD,
             )
             break
 
         if attempt_num < _MAX_ATTEMPTS:
             logger.info(
-                "Attempt %d scored %.2f (< %.1f), will retry with feedback",
-                attempt_num,
-                critique.avg_score if critique else 0,
-                _CRITIQUE_THRESHOLD,
+                "%s view attempt %d scored %.2f (< %.1f), will retry",
+                view_label, attempt_num, critique.avg_score, _CRITIQUE_THRESHOLD,
             )
 
     if best_attempt is None:
@@ -200,7 +277,7 @@ generated to represent a specific person's ideal room.
 
 **Persona**: {persona}
 **Target atmosphere**: mood={mood}, lighting={lighting}, style={style}
-**Key objects that should be present**: {objects}
+**Key objects that should be present in this view**: {objects}
 
 Score the image on these 4 dimensions (1-4 scale, where 4 is excellent):
 
@@ -218,10 +295,15 @@ async def _critique_image(
     prompt_data: ImageGenPrompt,
     profile: AggregatedProfile,
 ) -> CritiqueScores | None:
-    """Critique a generated image with Gemini Flash."""
+    """Critique a generated image with Gemini Flash.
+
+    Uses the per-view object list (prompt_data.object_details) so each view
+    is only judged on its own objects, not the full profile.
+    """
     image_bytes = base64.b64decode(image_b64)
 
-    objects_list = ", ".join(o.name for o in profile.key_objects)
+    # Per-view critique: use this view's object details, not the full profile
+    objects_list = ", ".join(od.name for od in prompt_data.object_details)
 
     prompt = _CRITIQUE_PROMPT.format(
         persona=profile.persona_summary,

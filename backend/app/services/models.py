@@ -27,7 +27,7 @@ __all__ = [
     # Stage 3
     "LayoutPlan", "ObjectDetail", "ImageGenPrompt",
     # Stage 4
-    "CritiqueScores", "GenerationAttempt", "ImageGenResult",
+    "CritiqueScores", "GenerationAttempt", "ImageGenResult", "DualImageGenResult",
     # Stage 5 (re-exports)
     "ConvertToSceneResult", "ViewerData",
 ]
@@ -124,6 +124,9 @@ class LayoutPlan(BaseModel):
     visual_flow: str = ""
     camera_position: str = ""
     camera_direction: str = ""
+    camera_direction_back: str = ""
+    forward_objects: list[str] = Field(default_factory=list)
+    backward_objects: list[str] = Field(default_factory=list)
 
 
 class ObjectDetail(BaseModel):
@@ -176,3 +179,8 @@ class ImageGenResult(BaseModel):
     final_critique: CritiqueScores | None = None
     attempts: list[GenerationAttempt] = Field(default_factory=list)
     total_attempts: int = 0
+
+
+class DualImageGenResult(BaseModel):
+    forward: ImageGenResult = Field(default_factory=ImageGenResult)
+    backward: ImageGenResult = Field(default_factory=ImageGenResult)
